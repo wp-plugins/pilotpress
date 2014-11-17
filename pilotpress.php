@@ -3,7 +3,7 @@
 Plugin Name: PilotPress
 Plugin URI: http://officeautopilot.com/
 Description: OfficeAutoPilot / Ontraport WordPress integration plugin.
-Version: 1.6.0i
+Version: 1.6.0j
 Author: Ontraport Inc.
 Author URI: http://officeautopilot.com/
 Text Domain: pilotpress
@@ -20,7 +20,7 @@ Copyright: 2013, Ontraport
 	
 	class PilotPress {
 
-        const VERSION = "1.6.0i";
+        const VERSION = "1.6.0j";
 		const WP_MIN = "3.0";
 		const NSPACE = "_pilotpress_";
 		const URL_JQCSS = "https://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/smoothness/jquery-ui.css";
@@ -92,9 +92,9 @@ Copyright: 2013, Ontraport
 					"content" => "This content will be replaced by the Customer Center"
 				),
 				"affiliate_center" => array(
-					"title" => "Affiliate Center",
+					"title" => "Partner Center",
 					"slug" => "affiliate-center",
-					"content" => "This content will be replaced by the Affiliate Center"
+					"content" => "This content will be replaced by the Partner Center"
 				),
 			);
 		}
@@ -130,6 +130,8 @@ Copyright: 2013, Ontraport
 
 				$this->settings["pilotpress"] = get_option("pilotpress-settings");
 				
+				$this->api_version = get_option("pilotpress_api_version");
+
 				if($this->get_setting("usehome")) {
 					$this->homepage_url = home_url();
 				} else {
@@ -148,7 +150,7 @@ Copyright: 2013, Ontraport
 
 					$app_id = explode("_", $this->get_setting("app_id"));
 					if(count($app_id) == 3) {
-						if($app_id[1] > 20000) {
+						if($app_id[1] > 20000 || $this->api_version ) {
 							self::$brand = "ONTRAPORT";
 							self::$brand_url = "ontraport.com";
 
@@ -195,6 +197,14 @@ Copyright: 2013, Ontraport
 							$_SESSION["user_levels"] = $api_result["membership_level"];
 						}
 						$this->status = 1;
+
+						//Lets store the API version into their options table if available
+						if (isset($api_result["pilotpress_api_version"]))
+						{
+							update_option("pilotpress_api_version" , $api_result["pilotpress_api_version"]);
+						}
+						
+
 					}
 				} else {
 					$this->status = 0;
@@ -319,11 +329,11 @@ Copyright: 2013, Ontraport
 
 			add_settings_section('settings_section_oap', __(self::$brand . ' Integration Settings', 'pilotpress'), array(&$this, 'settings_section_oap'), 'pilotpress-settings'); 
 			add_settings_field('customer_center',  __('Enable Customer Center', 'pilotpress'), array(&$this, 'display_settings_cc'), 'pilotpress-settings', 'settings_section_oap');
-			add_settings_field('affiliate_center',  __('Enable Affiliate Center', 'pilotpress'), array(&$this, 'display_settings_ac'), 'pilotpress-settings', 'settings_section_oap');
+			add_settings_field('affiliate_center',  __('Enable Partner Center', 'pilotpress'), array(&$this, 'display_settings_ac'), 'pilotpress-settings', 'settings_section_oap');
 
 			add_settings_section('pilotpress-redirect-display', __('Post Login Redirect Settings', 'pilotpress'), array(&$this, 'settings_section_redirect'), 'pilotpress-settings'); 
 			add_settings_field('pilotpress_customer_plr', __('Customers Redirect To', 'pilotpress'), array(&$this, 'display_settings_customer_plr'), 'pilotpress-settings', 'pilotpress-redirect-display');
-			add_settings_field('pilotpress_affiliate_plr', __('Affiliates Redirect To', 'pilotpress'), array(&$this, 'display_settings_affiliate_plr'), 'pilotpress-settings', 'pilotpress-redirect-display');
+			add_settings_field('pilotpress_affiliate_plr', __('Partners Redirect To', 'pilotpress'), array(&$this, 'display_settings_affiliate_plr'), 'pilotpress-settings', 'pilotpress-redirect-display');
 
 			add_settings_section('pilotpress-settings-advanced', __('Advanced Settings', 'pilotpress'), array(&$this, 'settings_section_advanced'), 'pilotpress-settings'); 
 			add_settings_field('pp_use_cache', __('Disable API Caching', 'pilotpress'), array(&$this, 'display_settings_disablecaching'), 'pilotpress-settings', 'pilotpress-settings-advanced');
@@ -598,10 +608,11 @@ Copyright: 2013, Ontraport
 				add_filter('admin_init', array(&$this, 'clean_meta'));
 				add_filter('admin_init', array(&$this, 'flush_rewrite_rules'));
 				add_filter('admin_init', array(&$this, 'user_lockout'));
+				add_action('admin_init', array(&$this, 'admin_load_scripts'));
 				add_action('admin_notices', array(&$this, 'display_notice'));
 
 				add_action('admin_menu', array(&$this, 'metabox_add'));
-				add_action('save_post', array(&$this, 'metabox_save'));
+				add_action('pre_post_update', array(&$this, 'metabox_save'));
 
 				add_action('media_buttons', array(&$this, 'media_button_add'), 20);
 				add_action('media_upload_forms', array(&$this, 'media_upload_forms'));
@@ -700,7 +711,14 @@ Copyright: 2013, Ontraport
 			wp_enqueue_script("jquery");
 			wp_register_script("mr_tracking", self::$url_tjs, array(), false, true);
 			wp_enqueue_script("mr_tracking");
+		}
 
+		/*
+			@brief only load these scripts if in the admin dashboard
+
+		*/
+		function admin_load_scripts() 
+		{
 			// Here to determine if the automattic color picker 'iris' is included with wordpress... if not, include and use it
 			$version = get_bloginfo('version');
 			if ($version < 3.5)
@@ -730,8 +748,9 @@ Copyright: 2013, Ontraport
 			    wp_enqueue_style( 'wp-color-picker' );
 			    wp_enqueue_script('iris'); 
 			}
-		}
 
+		}
+		
 		function stylesheets() {
 
 			wp_register_style("mrjswp", self::$url_jswpcss);
@@ -2771,7 +2790,7 @@ Copyright: 2013, Ontraport
 					if(empty($ac_exists)) {
 						delete_post_meta($result->post_id, $result->meta_key);
 						add_post_meta($post_id, PilotPress::NSPACE."system_page", "affiliate_center");
-						wp_update_post(array("ID" => $post_id, "post_content" => "This content will be replaced by the Affiliate Center."));
+						wp_update_post(array("ID" => $post_id, "post_content" => "This content will be replaced by the Partner Center."));
 					}
 				}
 
