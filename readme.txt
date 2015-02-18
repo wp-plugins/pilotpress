@@ -67,6 +67,8 @@ If you have Pilotpress installed, you can create a new page and simply enter "[l
 * Merged the Plugin Session Slap into PilotPress to keep sessions alive
 * Added ability to sort table headers in Customer Center
 * Fixed bug with the show_if shortcode not working properly if a membership level or tag has an HTML Entity;
+* Fixed bug where featured images would not show up properly when creating a new post
+* Fixed improper use of do_action('wp_login')
 
 = 1.6.0j =
 * Updated action hook for saving posts from save_post to pre_post_update
@@ -144,6 +146,8 @@ If you have Pilotpress installed, you can create a new page and simply enter "[l
 * Merged the Plugin Session Slap into PilotPress to keep sessions alive
 * Added ability to sort tables in Customer Center
 * Fixed bug with the show_if shortcode not working properly if a membership level or tag has an HTML Entity;
+* Fixed bug where featured images would not show up properly when creating a new post
+* Fixed improper use of do_action('wp_login')
 
 = 1.6.0j =
 * Updated action hook for saving posts from save_post to pre_post_update
