@@ -3,7 +3,7 @@
 Plugin Name: PilotPress
 Plugin URI: http://ontraport.com/
 Description: OfficeAutoPilot / Ontraport WordPress integration plugin.
-Version: 1.7.2
+Version: 1.7.3
 Author: Ontraport Inc.
 Author URI: http://ontraport.com/
 Text Domain: pilotpress
@@ -20,7 +20,7 @@ Copyright: 2013, Ontraport
 	
 	class PilotPress {
 
-        const VERSION = "1.7.2";
+        const VERSION = "1.7.3";
 		const WP_MIN = "3.0";
 		const NSPACE = "_pilotpress_";
 		const URL_JQCSS = "https://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/smoothness/jquery-ui.css";
@@ -170,8 +170,15 @@ Copyright: 2013, Ontraport
                         }
 					}
 
-					if(isset($_SESSION["contact_id"])) {
-						$api_result = $this->api_call("get_site_settings", array("site" => site_url(), "contact_id" => $_SESSION["contact_id"], "username" => $_SESSION["user_name"]));
+					if(isset($_COOKIE["contact_id"])) {
+						if(!function_exists('get_currentuserinfo'))
+						{
+						    include(ABSPATH . "wp-includes/pluggable.php"); 
+						}
+						global $current_user;
+						get_currentuserinfo();
+						$username = $current_user->user_login;
+						$api_result = $this->api_call("get_site_settings", array("site" => site_url(), "contact_id" => $_COOKIE["contact_id"], "username" => $username));
 					}
 					else {
 						$api_result = $this->api_call("get_site_settings", array("site" => site_url()));
@@ -1564,7 +1571,10 @@ Copyright: 2013, Ontraport
 		/* ok, time for some seriousness... this does the login. see additional comments inline */
 		function user_login($username, $password) {
 			if(isset($_POST["wp-submit"])) {
+
+				//Wordpress trims trailing and leading spaces before authenticating, lets do the same.
 				$password = trim($password);
+
                 $hashed_password = $username . self::VERSION . $password . self::AUTH_SALT;
  
                 $supported_algos = hash_algos();
@@ -1656,8 +1666,13 @@ Copyright: 2013, Ontraport
                         setcookie("contact_id", $api_result["contact_id"], (time() + 2419200), COOKIEPATH, $cookie_domain, false);
 												
 						$user_id = $user->ID;
+						$remember = false;
+						if (!empty($_POST["rememberme"]))
+						{
+							$remember = true;
+						}
 						wp_set_current_user($user_id, $username);
-						wp_set_auth_cookie($user_id);
+						wp_set_auth_cookie($user_id ,$remember);
 						do_action('wp_login', $username , $user);
 
 						if(!isset($_SESSION["user_name"])) {
@@ -2230,7 +2245,7 @@ Copyright: 2013, Ontraport
 
 			$page_levels = get_post_meta($id, "_pilotpress_level");
 			$user_levels = $this->get_setting("levels","user",true);
-			
+
 			if(!is_array($user_levels)) {
 				$user_levels = array($user_levels);
 			}
