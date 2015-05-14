@@ -3,7 +3,7 @@
 Plugin Name: PilotPress
 Plugin URI: http://ontraport.com/
 Description: OfficeAutoPilot / Ontraport WordPress integration plugin.
-Version: 1.7.3
+Version: 1.7.4
 Author: Ontraport Inc.
 Author URI: http://ontraport.com/
 Text Domain: pilotpress
@@ -20,7 +20,7 @@ Copyright: 2013, Ontraport
 	
 	class PilotPress {
 
-        const VERSION = "1.7.3";
+        const VERSION = "1.7.4";
 		const WP_MIN = "3.0";
 		const NSPACE = "_pilotpress_";
 		const URL_JQCSS = "https://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/smoothness/jquery-ui.css";
@@ -50,40 +50,9 @@ Copyright: 2013, Ontraport
 	
 			$this->bind_hooks(); /* hook into WP */
 			$this->start_session(); /* use sessions, controversial but easy */
-			$this->load_settings(); /* hitup the API or grab transient */
-	
+			
 			/* use this var, it's handy */
 			$this->uri = get_option('siteurl').'/wp-content/plugins/'.dirname(plugin_basename(__FILE__));
-			
-			/* metaboxes in admin */
-			$this->metaboxes[self::NSPACE."page_box"] = array(
-			    	'id' => self::NSPACE.'page_box',
-			    	'title' => 'PilotPress Options',
-			    	'context' => 'side',
-			    	'priority' => 'high',
-			    	'fields' => array(
-			        	array(
-			            		'name' => 'Access Levels',
-			            		'desc' => 'To have no level, do not check any boxes.',
-			            		'id' => self::NSPACE.'level',
-			            		'type' => 'multi-checkbox',
-			            		'options' => $this->get_setting("membership_levels", "oap")
-			        	),
-						array(
-			            		'name' => 'Show in Navigation',
-			            		'desc' => false,
-			            		'id' => self::NSPACE.'show_in_nav',
-			            		'type' => 'single-checkbox'
-			   			),
-						array(
-			            		'name' => 'On Error',
-			            		'desc' => $this->get_setting("error_redirect_message"),
-			            		'id' => self::NSPACE.'redirect_location',
-			            		'type' => $this->get_setting("error_redirect_field"),
-			            		'options' => array()
-			        	)
-			     	)
-			);
 			
 			/* the various Centers */
 			$this->centers = array(
@@ -170,11 +139,8 @@ Copyright: 2013, Ontraport
                         }
 					}
 
-					if(isset($_COOKIE["contact_id"])) {
-						if(!function_exists('get_currentuserinfo'))
-						{
-						    include(ABSPATH . "wp-includes/pluggable.php"); 
-						}
+					//Only make use of cookie if not an admin user.
+					if(isset($_COOKIE["contact_id"]) && !current_user_can('manage_options')) {
 						global $current_user;
 						get_currentuserinfo();
 						$username = $current_user->user_login;
@@ -784,6 +750,8 @@ Copyright: 2013, Ontraport
 		private function bind_hooks() {
 
 			add_action("init", array(&$this, "load_scripts"));
+			/* hitup the API or grab transient */
+			add_action("init", array(&$this, "load_settings"));
 			add_action('init', array(&$this,'sessionslap_ping'));
 			add_action('wp_print_styles', array(&$this, 'stylesheets'));
 			add_action('wp_print_footer_scripts', array(&$this, 'tracking'));
@@ -798,6 +766,7 @@ Copyright: 2013, Ontraport
 				add_filter('admin_init', array(&$this, 'clean_meta'));
 				add_filter('admin_init', array(&$this, 'flush_rewrite_rules'));
 				add_filter('admin_init', array(&$this, 'user_lockout'));
+				add_action('admin_init', array(&$this, 'load_metaboxes'));
 				add_action('admin_enqueue_scripts', array(&$this, 'admin_load_scripts'));
 				add_action('admin_notices', array(&$this, 'display_notice'));
 
@@ -1837,7 +1806,42 @@ Copyright: 2013, Ontraport
 			global $wpdb;
 			$wpdb->query("DELETE FROM $wpdb->postmeta WHERE meta_key = '_pilotpress_level' AND meta_value = ''");
 		}
-	
+
+		/* Load up the membership level meta boxes but after we have gotten the levels */
+		function load_metaboxes() {
+
+			/* metaboxes in admin */
+			$this->metaboxes[self::NSPACE."page_box"] = array(
+			    	'id' => self::NSPACE.'page_box',
+			    	'title' => 'PilotPress Options',
+			    	'context' => 'side',
+			    	'priority' => 'high',
+			    	'fields' => array(
+			        	array(
+			            		'name' => 'Access Levels',
+			            		'desc' => 'To have no level, do not check any boxes.',
+			            		'id' => self::NSPACE.'level',
+			            		'type' => 'multi-checkbox',
+			            		'options' => $this->get_setting("membership_levels", "oap")
+			        	),
+						array(
+			            		'name' => 'Show in Navigation',
+			            		'desc' => false,
+			            		'id' => self::NSPACE.'show_in_nav',
+			            		'type' => 'single-checkbox'
+			   			),
+						array(
+			            		'name' => 'On Error',
+			            		'desc' => $this->get_setting("error_redirect_message"),
+			            		'id' => self::NSPACE.'redirect_location',
+			            		'type' => $this->get_setting("error_redirect_field"),
+			            		'options' => array()
+			        	)
+			     	)
+			);
+
+		}
+
 		/* shortcodes for conditional ifs */
 		function shortcode_show_if($atts, $content = null) {
 
@@ -2994,7 +2998,7 @@ Copyright: 2013, Ontraport
 						jQuery(".op-login-form-'.$this->incrementalnumber.' #pp-lf-forgotpw").click(function()
 							{ 
 								jQuery(".op-login-form-'.$this->incrementalnumber.' .login-password, .op-login-form-'.$this->incrementalnumber.' .login-remember").hide(300);
-								jQuery(".op-login-form-'.$this->incrementalnumber.' #pp-loginform").attr( "action", "http://'.$_SERVER["SERVER_NAME"].'/wp-login.php?action=lostpassword");
+								jQuery(".op-login-form-'.$this->incrementalnumber.' #pp-loginform").attr( "action", "'.site_url().'/wp-login.php?action=lostpassword");
 								jQuery(".op-login-form-'.$this->incrementalnumber.' .login-username label").text("Enter your Username or Email");
 								jQuery(".op-login-form-'.$this->incrementalnumber.' .login-username input").attr("name", "user_login");
 								jQuery(".op-login-form-'.$this->incrementalnumber.' #wp-submit").attr("value", "Send me my Password!");
