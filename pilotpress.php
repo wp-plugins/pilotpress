@@ -2,9 +2,9 @@
 /*
 Plugin Name: PilotPress
 Plugin URI: http://ontraport.com/
-Description: OfficeAutoPilot / Ontraport WordPress integration plugin.
-Version: 1.7.6
-Author: Ontraport Inc.
+Description: OfficeAutoPilot / ONTRAPORT WordPress integration plugin.
+Version: 1.8.0
+Author: ONTRAPORT Inc.
 Author URI: http://ontraport.com/
 Text Domain: pilotpress
 Copyright: 2013, Ontraport
@@ -20,7 +20,7 @@ Copyright: 2013, Ontraport
 	
 	class PilotPress {
 
-        const VERSION = "1.7.6";
+        const VERSION = "1.8.0";
 		const WP_MIN = "3.0";
 		const NSPACE = "_pilotpress_";
 		const URL_JQCSS = "https://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/smoothness/jquery-ui.css";
@@ -144,10 +144,10 @@ Copyright: 2013, Ontraport
 						global $current_user;
 						get_currentuserinfo();
 						$username = $current_user->user_login;
-						$api_result = $this->api_call("get_site_settings", array("site" => site_url(), "contact_id" => $_COOKIE["contact_id"], "username" => $username));
+						$api_result = $this->api_call("get_site_settings", array("site" => site_url(), "contact_id" => $_COOKIE["contact_id"], "username" => $username , "version"=>self::VERSION ));
 					}
 					else {
-						$api_result = $this->api_call("get_site_settings", array("site" => site_url()));
+						$api_result = $this->api_call("get_site_settings", array("site" => site_url() , "version"=>self::VERSION ));
 					}
 
 					if(is_array($api_result)) {
@@ -163,11 +163,12 @@ Copyright: 2013, Ontraport
 																	
 						$_SESSION["default_fields"] = $this->settings["oap"]["default_fields"];
 
-						if(isset($api_result["fields"])) {
-							$_SESSION["user_fields"] = $api_result["fields"];
-						}
 						if(isset($api_result["membership_level"])) {
 							$_SESSION["user_levels"] = $api_result["membership_level"];
+							if(!empty($username))
+							{
+								$_SESSION["user_name"] = $username;
+							}							
 						}
 						$this->status = 1;
 
@@ -249,13 +250,25 @@ Copyright: 2013, Ontraport
 		/* ditto getter is also handy */
 		function get_field($key) {
 			foreach($this->get_setting("fields", "user", true) as $group => $fields) {
-				if(isset($fields[$key])) {
+				if(isset($fields[$key])) 
+				{
 					return $fields[$key];
 				}
+				else if (isset($fields[html_entity_decode($key)]))
+				{
+					return $fields[html_entity_decode($key)];
+				}
+				
 			}
+
 			foreach($this->get_setting("default_fields", "oap", true) as $group => $fields) {
-				if(isset($fields[$key])) {
+				if(isset($fields[$key])) 
+				{
 					return $fields[$key];
+				}
+				else if (isset($fields[html_entity_decode($key)]))
+				{
+					return $fields[html_entity_decode($key)];
 				}
 			}
 			return "";
@@ -281,7 +294,6 @@ Copyright: 2013, Ontraport
 				$return["name"] = $_SESSION["user_name"];
 				$return["username"] = $_SESSION["user_name"];
 				$return["nickname"] = $_SESSION["nickname"];
-				$return["fields"] = $_SESSION["user_fields"];
 				$return["levels"] = $_SESSION["user_levels"];
 			}
 			return $return;
@@ -1253,7 +1265,7 @@ Copyright: 2013, Ontraport
 					var viral = $('#viral_'+the_video_id).val();
                     var omit_flowplayerjs = false;
 
-                    if($("textarea.wp-editor-area", top.document).val().indexOf("clientvids/flowplayer") !== -1) {
+                    if($("textarea.wp-editor-area", top.document).val().indexOf("oap_flow/flowplayer") !== -1) {
                         omit_flowplayerjs = true;
                     }
 
@@ -1654,7 +1666,6 @@ Copyright: 2013, Ontraport
 							$_SESSION["user_name"] = $api_result["username"];
 							$_SESSION["nickname"] = $api_result["nickname"];
 							$_SESSION["user_levels"] = $api_result["membership_level"];
-							$_SESSION["user_fields"] = $api_result["fields"];
 							$_SESSION["rehash"] = true;
 						}
 						
@@ -2038,12 +2049,61 @@ Copyright: 2013, Ontraport
 					if(is_page() && in_array($post->ID, $this->system_pages)) {
 						$content = $this->do_system_page($post->ID);
 					}
+
+					if (has_shortcode($content, "pilotpress_field") || has_shortcode($content, "field"))
+					{
+						// Lets grab all the fields here with the API call and store them later
+						// Since the shortcode hook runs after this one it is a safe spot to check and make if needed.
+						$this->get_merge_field_settings($content);
+					}
 				}
 			}	
 
 			return $content;
 		}
-	
+
+		/** 
+		 *  @brief Make api call to grab merge fields that are only present in the content
+		 *
+		 *  @param String $content the string to check if merge fields are present
+		 *
+		 */
+		function get_merge_field_settings($content)
+		{
+			$this->shortcodeFields = array();
+		    $pattern = get_shortcode_regex();
+		    preg_match_all('/'.$pattern.'/uis', $content, $matches);
+
+		    for ( $i=0; $i < count($matches[0]); $i++ ) 
+		    {
+		    	$fields = shortcode_parse_atts($matches[3][$i]);
+
+		        if ( isset( $matches[2][$i] ) && ($matches[2][$i] == "pilotpress_field" || $matches[2][$i] == "field") ) 
+		        {
+		           $this->shortcodeFields[$fields["name"]] = 1;
+		        }
+		    }
+
+		    //make API call now as well if needed!
+		    if (!empty($this->shortcodeFields) && is_array($this->shortcodeFields) && !empty($_SESSION["user_name"]))
+		    {
+		    	$data = array(
+		    		"username" => $_SESSION["user_name"],
+		    		"fields" => $this->shortcodeFields,
+		    		"site" => site_url()
+		    	);
+		    	
+		    	$api_result = $this->api_call("get_contact_merge_fields" , $data);
+
+    			if(isset($api_result["fields"])) 
+    			{
+    				// In order for the get_field() to work later on we need to add these fields to the group list of known merged fields.
+					$_SESSION["user_fields"]["--merged fields--"] = $api_result["fields"];
+					$this->settings["user"]["fields"]["--merged fields--"] = $api_result["fields"];
+				}
+		    }
+		}
+
 		/* this is arguably the nastiest part of PilotPress, but unfortunately WP has consistently decided to not allow non-theme based manipulation of viewable pages */
 		function get_routeable_pages($exclude = "") {
 
