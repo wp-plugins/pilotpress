@@ -56,9 +56,12 @@ If you have Pilotpress installed, you can create a new page and simply enter "[l
 
 == Changelog ==
 
+= 1.8.1 = 
+* Added new PilotPress text widget to allow merge codes to merge easily and without any extra modifications to your theme.
+
 = 1.8.0 =
 * Decreased page load times and login times dramatically by defferring several database calls to only when you need them instead of every page load.
-* Fixed issue with ONTRAPORT merge codes not merging properly when the name had html entities.
+* Fixed issue with ONTRAPORT merge codes not merging properly when the name had html entitites.
 * Fixed issue with the Customer Center not properly displaying after closing the browser and you logged in through the Remember Me option.
 
 = 1.7.7 =
@@ -162,9 +165,12 @@ If you have Pilotpress installed, you can create a new page and simply enter "[l
 
 == Upgrade Notice ==
 
+= 1.8.1 = 
+* Added new PilotPress text widget to allow merge codes to merge easily and without any extra modifications to your theme.
+
 = 1.8.0 =
 * Decreased page load times and login times dramatically by defferring several database calls to only when you need them instead of every page load.
-* Fixed issue with ONTRAPORT merge codes not merging properly when the name had html entities.
+* Fixed issue with ONTRAPORT merge codes not merging properly when the name had html entitites.
 * Fixed issue with the Customer Center not properly displaying after closing the browser and you logged in through the Remember Me option.
 
 = 1.7.7 =
